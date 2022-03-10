@@ -1,0 +1,172 @@
+---
+title: "Assignment 4"
+author: "Ellie Grace Moore with consultations from Jill Ahmad"
+date: "10/27/2021"
+output: 
+  html_document: 
+    highlight: pygments
+    theme: cosmo
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+```{r data}
+serengeti <- read.csv("HW4Data.csv", header = TRUE)
+```
+
+|       Throughout the code below we begin by fitting a full model for each species. Notice that our response variables are a 1 or a 0, indicating whether that animal was present or not. With this being said, the appropriate family of distributions to which we fit our models will be binomial. More specifically, our indicator response variables demonstrate the binomial distribution for which the number of trials is one.
+
+|       After we fit the model, we have a line of code with a ```{r} step``` function. The purpose of this code is to go through and fit multiple models, only adding and subtracting different variables along the way. We then compare the AIC for each model--AIC is simply a method by which models are compared, and then selected. By this process, we are able to choose the specific set of variables that result in the model with the lowest AIC; which, in theory is the best model for the data. 
+
+```{r}
+ZebraFull <- glm(zebra.present ~ ndvi + fire + amRivDist + TM100 + LriskDry + T50 + topi.present + gazelleThomsons.present, data = serengeti, family = binomial(link="logit"))
+step(ZebraFull, direction = "both")
+```
+
+
+
+|       After the selection process, we are able to see that the following model for the zebras results in the lowest AIC:
+After the selection process, we are able to see that the Bernoulli model with the following probability $p_i$ for the $i^{th}$ observation, best fits our data:
+
+$$ p_i(\eta)=\frac{e^{\eta}}{1+e^{\eta}} \text{ where}$$
+$$ \eta = \beta_0 + \beta_1TM100 + \beta_2 LriskDry + \beta_3T50 + \beta_4gazelleThomsons.present.$$
+|       To interpret, the probability of a zebra being present, $p_i$, depends exponentially on the following factors: the number of termite mounds, the lion predation risk, the number of trees, and whether or not gazelles were present. However, with any model, we have levels of uncertainty. Thus we have provided the following confidence intervals for each of our parameters. Each interval can be interpreted in the following way: we are 95% confident that the true parameter lies within the given interval. 
+
+
+
+```{r}
+ZebraModel <- glm(formula = zebra.present ~ TM100 + LriskDry + T50 + gazelleThomsons.present, 
+    family = binomial(link = "logit"), data = serengeti)
+confint(ZebraModel)
+```
+
+|       We now go through the exact same process only for the topis:
+
+```{r}
+TopiFull <- glm(topi.present ~ ndvi + fire + amRivDist + TM100 + LriskDry + T50 + zebra.present + gazelleThomsons.present, data = serengeti, family = binomial(link="logit"))
+step(TopiFull, direction = "both")
+```
+
+|       After the selection process, we are able to see that the Bernoulli model with the following probability $p_i$ for the $i^{th}$ observation, best fits our data:
+
+$$ p_i(\eta)=\frac{e^{\eta}}{1+e^{\eta}} \text{ where}$$
+$$ \eta = \beta_0 + \beta_1ndvi + \beta_2 fire + \beta_3 amRivDist + \beta_4 TM100 + \beta_5LriskDry + \beta_6T50 + \beta_7zebra.present + \beta_8gazelleThomsons.present.$$
+
+|           To interpret, the probability of a topi being present, $p_i$, depends exponentially on the following factors: ndvi, fire, distance to the nearest river, the termite mounds, predation risk for lions, the number of trees, and whether or not zebras and gazelles were present. theWe once again provide the confidence intervals for each of our parameters:
+
+```{r}
+
+TopiModel <- glm(formula = topi.present ~ amRivDist + LriskDry + T50, family = binomial(link = "logit"), 
+    data = serengeti)
+confint(TopiModel)
+```
+
+|       Lastly, we conduct the same methodology but for a Thomsons gazelle:
+
+
+```{r}
+GazelleFull <- glm(gazelleThomsons.present ~ ndvi + fire + amRivDist + TM100 + LriskDry + T50 + zebra.present + topi.present, data = serengeti, family = binomial(link="logit"))
+step(GazelleFull, direction = "both")
+```
+
+|       After the selection process, the we are able to see that the Bernoulli model with the following probability $p_i$ for the $i^{th}$ observation, best fits our data for the gazelles (while also offering confidence intervals):
+
+$$ p_i(\eta)=\frac{e^{\eta}}{1+e^{\eta}} \text{ where}$$
+$$ \eta = \beta_0 + \beta_1ndvi + \beta_2 fire + \beta_3 amRivDist + \beta_4 TM100 + \beta_7zebra.present.$$
+|       To interpret, the probability of a topi being present, $p_i$, depends exponentially on the following factors: ndvi, fire, the distance to the nearest river, the number of termites mounds, and whether or not zebras were present. We also provide the confidence intervals for each parameters:
+
+```{r} 
+GazelleModel <- lm(formula = gazelleThomsons.present ~ ndvi + fire + amRivDist + 
+    TM100 + zebra.present, family = binomial(link = "logit"), 
+    data = serengeti)
+
+confint(GazelleModel)
+```
+
+
+### 2
+
+|       Now, one might argue that it is reasonable to think that two neighboring time steps are \textit{not} independent. Biologically, this might make more sense since if zebras and gazelles live in symbiosis, then zebras might be more likely to appear at a given site depending on if a gazelle was there before. We take this issue into account in the code below. What we are doing is we separate the data into its 8-day periods, created new variables for each animal `{r} zebraLastWeek, topi.LastWeek, gazelleThomsons.LastWeek`, indicating if that animal was present or not the last week. 
+
+```{r mutations}
+### Preliminary data alterations
+
+n <- nrow(serengeti)
+gazelle.LastWeek <- rep(NA, n)
+topi.LastWeek <- rep(NA, n)
+zebra.LastWeek <- rep(NA, n)
+
+serengeti$gazelle.LastWeek <- gazelle.LastWeek
+serengeti$topi.LastWeek <- topi.LastWeek
+serengeti$zebra.LastWeek <- zebra.LastWeek
+
+```
+
+```{r loops}
+for(siteID in unique(serengeti$siteID)[1]) {
+  for(i in 1:(n-1)) {
+    if (serengeti$gazelleThomsons.present[i] == "1") {
+      serengeti$gazelle.LastWeek[i+1] = 1
+    }
+    else serengeti$gazelle.LastWeek[i+1] = 0
+    if (serengeti$zebra.present[i] == "1") {
+      serengeti$zebra.LastWeek[i+1] = 1
+    }
+  else serengeti$zebra.LastWeek[i+1] = 0
+    if(serengeti$topi.present[i] == "1") {
+      serengeti$topi.LastWeek[i+1] = 1
+    }
+  else serengeti$topi.LastWeek[i+1] = 0
+    }
+  
+}
+
+### Now we need to get rid of the first day for the new sites
+Serengeti <- serengeti[-c(47, 93, 139, 185, 231, 277, 323, 369, 415, 461, 507, 553, 599, 645, 691, 737, 783, 829, 875, 921)]
+```
+
+```{r model2}
+ZebraFull2 <- glm(formula = zebra.present ~ ndvi + fire + amRivDist + TM100 + LriskDry + T50 + topi.present + gazelleThomsons.present + zebra.LastWeek +topi.LastWeek+gazelle.LastWeek, 
+    family = binomial(link = "logit"), data = Serengeti)
+step(ZebraFull2, direction = "both")
+
+ZebraModel2 <- glm(formula = zebra.present ~ TM100 + T50 + gazelleThomsons.present + 
+    zebra.LastWeek, family = binomial(link = "logit"), data = Serengeti)
+```
+
+``` {r}
+TopiFull2 <- glm(formula = topi.present ~ ndvi + fire + amRivDist + TM100 + LriskDry + T50 + zebra.present + gazelleThomsons.present + zebra.LastWeek +topi.LastWeek+gazelle.LastWeek, 
+    family = binomial(link = "logit"), data = Serengeti)
+step(TopiFull2, direction = "both")
+
+TopiModel2 <- glm(formula = topi.present ~ amRivDist + LriskDry + T50 + topi.LastWeek, 
+    family = binomial(link = "logit"), data = Serengeti)
+```
+
+``` {r}
+GazelleFull2 <- glm(formula = gazelleThomsons.present ~ ndvi + fire + amRivDist + TM100 + LriskDry + T50 + topi.present + zebra.present + zebra.LastWeek +topi.LastWeek+gazelle.LastWeek, family = binomial(link = "logit"), 
+    data = Serengeti)
+step(GazelleFull2, direction = "both")
+
+GazelleModel2<- glm(formula = gazelleThomsons.present ~ ndvi + amRivDist + TM100 + 
+    zebra.present + zebra.LastWeek + topi.LastWeek + gazelle.LastWeek, 
+    family = binomial(link = "logit"), data = Serengeti)
+
+```
+
+|        From the code below, we see that the AIC's for our new models are lower than those of our originally-fitted models. Thus, we can conclude that it is a good idea to take the dependence of the time stamps into account when fitting these models for our data.
+
+```{r}
+
+AIC(ZebraModel)
+AIC(ZebraModel2)
+
+AIC(TopiModel)
+AIC(TopiModel2)
+
+AIC(GazelleModel)
+AIC(GazelleModel2)
+```
+

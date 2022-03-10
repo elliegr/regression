@@ -1,0 +1,157 @@
+---
+title: "Assignment 5"
+author: "Ellie Grace Moore with consultation from Jill Ahmad"
+date: "11/17/2021"
+output:
+  pdf_document: 
+    fig_width: 5
+    fig_height: 4
+    highlight: kate
+
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning= FALSE, message = FALSE)
+library(MASS)
+library(dplyr)
+library(pscl)
+```
+
+### 1. a) 
+
+|       Let $Y_i$ denote whether or not a satellite crab followed the $i^{th}$ female crab. Since $Y_i$ has two possible outcomes, this implies that $Y_i \text{ ~ } Bernoulli(p_i)$ where $p_i$ represents the probability that a satellite shows up for the $i^{th}$ female. Given that $p_i$ represents a probability, we must keep this in mind when choosing our link function. We will use $logit(p_i)$ as our link. In other words,
+
+$$ \log\big( \frac{p_i}{1-p_i}\big)=\eta_i \text{ where}$$
+$$\eta_i=\beta_0 + \beta_1 \cdot Color_i+\beta_2 \cdot Spine_i+ \beta_3 \cdot Width_i +\beta_4 \cdot Weight_i.$$
+
+|       Where the explanatory variables represent the color, spine, width, and weight for the $i^{th}$ female crab. The following code will filter through numerous models, adding and removing different explanatory variables in order to determine the "optimal" one *compared to the others*. 
+
+```{r 1a}
+
+crab <- read.csv("~/Desktop/crabs.csv")
+
+crab <- crab %>%
+    mutate(satell_ind = ifelse(satell > 1, 1, 0))##Adding the indicator variable
+
+step(glm(satell_ind ~ color + spine + width + weight, family = binomial(link = "logit"), crab), direction = "both") 
+Crab1 <- glm(satell_ind ~ color + weight, family = binomial(link = "logit"), crab)
+```
+
+|       According to the code, we are able to see that the most predictive features of a female crab that determine whether or not a satellite will appear are **color** and **weight**. So, knowing this, we can rewrite the model to be
+
+$$ Y_i \text{ ~ } Bernoulli(p_i),$$ 
+$$ \log\big( \frac{p_i}{1-p_i}\big)= \eta_i \text{ where }$$
+$$\eta_i=-2.162 - 0.3897\cdot Color_i+ 0.001541 \cdot Weight_i.$$
+
+|       We can now solve the link function for $p_i$ in order to get an expression for the probability that a satellite appears for the $i^{th}$ female given her color and weight:
+
+$$p_i=\frac{e^{\eta_i}}{1+e^{\eta_i}}=\frac{\exp({-2.162 - 0.3897\cdot Color_i+ 0.001541 \cdot Weight_i)}}{1+\exp({-2.162 - 0.3897\cdot Color_i+ 0.001541 \cdot Weight_i})}.$$
+
+|       Looking at the above formula for $p_i$, we are able to make the following **biological conclusion**: the darker and heavier a female crab is, the more likely she is to be followed by a satellite. In order to portray our uncertainty, the  95% confidence intervals for each coefficient are presented below. Note that since 0 is included in the interval for color, color may not be the strongest indicator on determining the probability of whether or not a satellite will follow a female crab. 
+
+```{r}
+confint(Crab1)
+```
+
+
+### (b)
+
+|   We will now slightly shift focus and have our response variable be the count of satellite crabs. First, by looking at the histogram below, we are able to see that overdispersion is present. Our mean is `r round(mean(crab$satell),2)` whereas our variance is `r round(var(crab$satell), 2)`. In order to take this into account and fit our model accordingly, we will continue by fitting a **negative binomial** model to our data. A log link function is an appropriate choice given that our response variable is a count. 
+
+```{r 1b, fig.align = 'center'}
+hist(crab$satell) 
+### Refit with negative binomial
+Crab_NG <- glm.nb(satell ~ color + spine+ width + weight, crab, link = "log")
+step(Crab_NG, direction = "both")
+```
+
+|       Once again, after filtering through numerous combinations of variables, we are see that after taking overdispersion into account, **color** and **weight** once again appear to be the most prominent predictors of the number of satellite crabs following a female. The specific model, as well as confidence intervals to denote our uncertainty for each coefficient, are shown below:
+
+$$ \log(p_i)= \eta_i \text{ where }$$
+
+$$\eta_i=-0.1487 + -0.1734 \cdot Color_i + 0.0007072 \cdot Weight_i, \implies p_i = e^{-0.1487 + -0.1734 \cdot Color_i + 0.0007072 \cdot Weight_i}.$$
+```{r}
+confint(glm.nb(satell ~ color  + weight, crab, link = "log"))
+```
+
+
+|       Thus we can come to a similar **biological conclusion** as before, the heavier and darker in a color a female crab is, more satellites will follow her. However, since zero is present in the interval for color, perhaps color does not have a significant influence on the number of satellites that follow a given female. The fact that this model resulted in once again, color and weight, being the most significant predictors for a satellites presence, could also support the notion that these predictors are indeed statistically significant. However, we can again notice that zero is included in the confidence interval for color. So perhaps its statistical significance is not as strong as it seems. 
+
+### 2.
+
+#### (a)
+
+|       We are interested in modeling the count of Topi which is our $Y_i$. Before we do so, let us look at a histogram to get a better feel for the data.
+
+```{r 2a1, fig.align='center'}
+serengeti <- read.csv("~/Desktop/STA712/HW4Data.csv")
+hist(serengeti$topi.count)
+```
+
+
+|   Looking at the histogram, we are able to see that this data is *zero-inflated*. In order to take this into account and build an accurate model, we will first filter through the data and only keep the observations where the count of Topi is greater than zero. Note that in this scenario--since we are not working with specific probabilities--we have chosen the *log* link function. Also since our response variable is the count of Topi, we have chosen Poisson regression. Our starting model is also based on predictors that we have deemed "most important" in determining the number of Topi at a given location.
+
+$$ Y_i \text{ ~ } Poisson(\lambda_i),$$ 
+$$ \log(\lambda_i)=\eta_i \text{ where}$$
+$$\eta_i=\beta_0 + \beta_1 \cdot NDVI_i+ \beta_2 \cdot amRivDist_i +\beta_3 \cdot TM100_i + \beta_4 \cdot T50_i + \beta_5 \cdot gazelleThomsons.count_i + \beta_6 \cdot zebra.count_i.$$
+
+```{r 2a2}
+serengeti_new <- serengeti[serengeti$topi.count>0,] 
+
+Topi <- glm(topi.count ~ ndvi  + amRivDist + TM100 + T50 + LriskDry + gazelleThomsons.count + zebra.count, data = serengeti_new, family=poisson(link = "log"))
+step(Topi, direction = "both")
+
+Topi_ <- glm(formula = topi.count ~ T50 + zebra.count, 
+    family = poisson(link = "log"), data = serengeti_new)
+```
+
+|       After filtering through numerous models with different combinations of variables, we are able to see that the optimal model *compared to the others* is the one with `T50` and `zebra.count` as predictors. In other words, the primary drivers of Topi count, given that Topi are detected, are the number of trees in the area and the count of zebras.  The specific model is shown below as well as confidence intervals for each coefficient in order to denote our uncertainty. Note that zero is included in the intervals for both variables, indicating that they may not be statistically significant after all.
+
+$$ Y_i \text{ ~ } Poisson(\lambda_i),$$ 
+
+$$ \log(\lambda_i)=0.865 + 0.000578 \cdot T50_i + 0.00684 \cdot zebra.count_i, \implies \lambda_i = e^{0.865 + 0.000578 \cdot T50_i + 0.00684 \cdot zebra.count_i}.$$
+```{r}
+confint(Topi_)
+```
+
+
+#### (b)
+
+|   We will now employ the use of a zero-inflated model directly. First, we identify the variables we deem most influential on whether a topi would be present and then build a model conditioned upon those variables. We have chosen these variables based on our findings in the last report. The variables we have chosen for this are `T50, amRivDist,` and `LriskDry`. We begin by fitting a full model.
+
+```{r 2b}
+ZIFL <- zeroinfl(topi.count ~ ndvi + amRivDist + TM100 + T50 + LriskDry + gazelleThomsons.count + zebra.count | LriskDry + amRivDist + T50, serengeti)
+summary(ZIFL)
+```
+
+|   Looking at the p-values, we are able to see that the ones for termite mounds and NDVI are significantly higher than the others. Therefore we fit a new model without these variables present and see the affect it has on the rest of the model.
+
+```{r}
+ZIFL <- zeroinfl(topi.count ~ amRivDist + T50 + LriskDry + gazelleThomsons.count + zebra.count | LriskDry + amRivDist + T50, serengeti)
+summary(ZIFL)
+```
+
+|   Looking at this new model, we see that the p-values for `LriskDry` and `gazelleThomsons.count` are higher than the rest, so we now remove that variable and fit a new model accordingly.
+
+```{r}
+ZIFL <- zeroinfl(topi.count ~ amRivDist + T50 + zebra.count | LriskDry + amRivDist + T50, serengeti)
+summary(ZIFL)
+```
+
+|   Lastly, we will get rid of the `T50` variable:
+
+```{r}
+ZIFL <- zeroinfl(topi.count ~ amRivDist + zebra.count | LriskDry + amRivDist + T50, serengeti)
+summary(ZIFL)
+```
+
+|   From the above code we can rewrite our final model as well as its confidence intervals as follows:
+
+$$ Y_i = topi.count_i \text{ ~ } Poisson(\lambda_i)$$
+$$ \log(\lambda_i) = 0.982 - 0.000116 \cdot amRivDist_i + 0.00627 \cdot zebra.count_i, \implies \lambda_i = e^{0.982 - 0.000116 \cdot amRivDist_i + 0.00627 \cdot zebra.count_i}.$$
+```{r}
+confint(ZIFL)
+```
+
+
+|   Thus we are able to come to the following **biological conclusion**: a one-unit increase in the number of zebras present at a site will result in an $e^{0.00627}$ increase in the number of topi, and a one-unit increase in the distance to the nearest river results in decreasing the number of topi by a factor of $e^{-0.000116}$. However, since zero is included in the intervals for `zebra.count` and `T50`, perhaps they may not be as statistically significant as they seem. 

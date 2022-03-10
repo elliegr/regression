@@ -1,0 +1,247 @@
+---
+title: "Assignment 1"
+author: "Ellie Grace Moore"
+date: "8/24/2021"
+output: 
+  html_document: 
+    highlight: haddock
+    theme: cosmo
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+library(ggplot2)
+library(purrr)
+library(GLMsData)
+library(dplyr)
+library(MASS)
+```
+
+\newline
+
+\newline
+
+
+### 1 (a)
+
+
+```{r data2}
+set.seed(7)
+x <- rgamma(50000, 2, 10)
+y <- rgamma(50000, 2, 20)
+z <- rgamma(50000, 4, 10)
+
+```
+
+
+```{r fig.align="center"}
+plot(density(x),
+     ylim = c(0,8),
+     xlim = c(0, 1),
+     lwd = 3,
+     main = "Different Shapes and Scales for Gamma Distribution",
+     col = "coral")
+lines(density(y),
+      lwd = 3,
+      col = "cornflowerblue")
+lines(density(z),
+      lwd = 3,
+      col = "seagreen")
+
+legend("topright", 
+  legend = c("k=2, theta=10", "k=2, theta=20", "k=4, theta=10"), 
+  col = c("cornflowerblue", "coral", "seagreen"), 
+  bty = "n",
+  pt.cex = 1.5, 
+  pch = 19,
+  cex = .9, 
+  text.col = "black",
+  inset = c(0.1, 0.1))
+
+```
+
+
+### 3.1.18 from The Textbook
+
+#### 1.
+
+```{r data plot, fig.align="center"}
+data(humanfat)
+
+plot(humanfat$Age, humanfat$Percent.Fat, 
+     col = c("cornflowerblue", "coral")[humanfat$Gender],
+     pch = 19,
+     main = "Age vs Bodyfat Percentage",
+     xlab = "Age",
+     ylab = "Bodyfat Percentage")
+
+legend("bottomright", 
+  legend = c("Male", "Female"), 
+  col = c("coral", "cornflowerblue"), 
+  bty = "n",
+  pt.cex = 1, 
+  pch = 19,
+  cex = .9, 
+  text.col = "black",
+  inset = c(0.1, 0.1))
+
+```
+
+#### 2. 
+
+```{r model} 
+### OFFICE HOURS 
+
+model <- lm(Percent.Fat ~ Gender * Age, data = humanfat)
+summary(model)
+
+```
+
+#### 3.
+
+|       The code above corresponds to a model of the form $PercentFat = \beta_0+\beta_1Gender \cdot I_M+\beta_2Age +\beta_3Age \cdot Gender \cdot I_M$ where $I_M$ is the indicator function $I_M=1$ if the subject is male and $I_M=0$ if the subject is female. With this being said, the systematic components for each gender are 0.2401 for females and 0.816 for males. 
+
+#### 4.
+
+|       Let us consider the two cases of Gender. If we we looking at a male subject, then $PercentFat = (\beta_0+\beta_1)+(\beta_2+\beta_3)Age$. Similarly, if we have a female subject, then $PercentFat = \beta_0 + \beta_2 Age$. We will use these models in order to make better interpretations of each coefficient. 
+
++ $\hat{\beta_0}$: If there is a female of zero age, then they have approximately 20% bodyfat. Although this may mathematically make sense, note that given the context of this problem this does not make much sense. 
+
++ $\beta_0 + \beta_1$: This represents the intercept if we have a male subject. In other words, if a male is of zero age, then he has approximately -9% bodyfat (once again, realistically this does not make much sense). However, $\beta_1$ represents the difference in intercepts between bodyfat percentage for females and males.
+
++ $\beta_2$: This represents the rate of change for our female model. In other words, for every year increase in a female's age, her bodyfat percentage increases by approximately 0.24%. 
+
++ $\beta_2 + \beta_3$: This term represents the rate of change for the male model. In other words, for every year increase in a male's age, his bodyfat percentage increases by approximately 0.8%.
+
++ $\beta_3$: Just looking at $\beta_3$, we can conclude that this represents the difference in the average increase between males and females. In other words, the average yearly increase for males is approximately 0.6% higher than the average yearly increase for females.
+
+
+#### 5.
+
+|       Looking at our model summary, we are able to see that the t-value for the interaction term is 1.978 with a p-value of 0.0679. For an alpha level of 0.05, we see that $0.0679 > 0.05$ and therefore, the interaction term is significant. However, I would argue that the probabilities are comparable and therefore there is not much significance in this term.
+
+#### 6.
+
+|       Let us conduct an F-Test on the following hypotheses (where $\hat{\beta_3}$ is the coefficient for the interaction term):
+
+$$ H_0: \hat{\beta_3} =0, H_a: \hat{\beta}_3 \neq0.$$
+
+``` {r}
+larger <- lm(Percent.Fat ~ Age * Gender, data = humanfat)
+small <- lm(Percent.Fat ~ Gender + Age, data = humanfat)
+
+anova(larger, small)
+
+RSS_small <- deviance(small)
+RSS_larger <- deviance(larger)
+df_small<- nrow(humanfat)-3
+df_larger <- nrow(humanfat)-4
+
+f <- ((RSS_small-RSS_larger)/(df_small-df_larger))/(RSS_larger/df_larger)
+f
+1-pf(f, df_small-df_larger, df_larger)
+```
+
+
+|       From the code above, we see that the F-statistic is 3.914 with P-value 0.0679. On the alpha level of 0.05, since 0.0679 > 0.05, we fail to reject the null hypothesis and therefore the interaction term has significance--although once again, perhaps not much.
+
+#### 7. 
+
+|       From the previous statements above, we know that the p-value for the t-test is 0.0679 and the p-value for the F-test is also 0.0679. The reason why these values are the same are because when performing an f-test for two variables, it is equivalent to performing a t-test. The calculation below demonstrates the relationship between the t-statistic and F-statistic.
+
+$$1.978^2=3.90$$
+
+#### 8.
+
+```{r reg lines, fig.align='center'}
+male_data <- subset(humanfat, Gender == "M")
+female_data <- subset(humanfat, Gender == "F")
+
+male <- lm(male_data$Percent.Fat ~ male_data$Age, data=male_data)
+female <- lm(female_data$Percent.Fat ~ female_data$Age, data = female_data)
+
+plot(humanfat$Age, humanfat$Percent.Fat, 
+     col = c("cornflowerblue", "coral")[humanfat$Gender],
+     pch = 19,
+     main = "Age vs Bodyfat Percentage",
+     xlab = "Age",
+     ylab = "Bodyfat Percentage")
+abline(male, col = "coral")
+abline(female, col = "cornflowerblue")
+
+legend("bottomright", 
+  legend = c("Male", "Female"), 
+  col = c("coral", "cornflowerblue"), 
+  bty = "n",
+  pt.cex = 1, 
+  pch = 19,
+  cex = .9, 
+  text.col = "black",
+  inset = c(0.1, 0.1))
+
+```
+
+
+#### 9.
+
+
+```{r CI}
+
+predict(male, level = 0.9, interval = "confidence") 
+predict(female, level = 0.9, interval = "confidence")
+```
+
+|       From looking at the numerous intervals above, we can observe that the intervals for the males are much wider than those for the females. This indicates that the model specifically does not fit to the male data well.
+
+#### 10. 
+
+|       We have already noticed that our model does not fit the male data well--although does fairly well for the females. Therefore, it is appropriate to only use  females in this study. 
+  
+#### 11.
+
+```{r female model}
+
+new_model <- lm(female_data$Percent.Fat ~ female_data$Age + female_data$BMI, data = female_data)
+summary(new_model)
+
+```
+
+#### 12. 
+
+|       We will first compute the critical leverage value for our particular dataset: $2(p+1)/n=2(2+1)/14=0.4286$. Now, we will calculate the leverage for each data entry and sort out the ones that are greater than this value: 
+
+```{r hat}
+hats <- as.data.frame(hatvalues(new_model))
+subset(hats, hats$`hatvalues(new_model)`>0.4286)
+```
+
+|       Therefore, we are able to conclude that the only two observations that could be argued to be outliers are the second and eleventh observation. 
+
+```{r cd}
+cook <- as.data.frame(cooks.distance(new_model))
+cook[order(-cook['cooks.distance(new_model)']), ]
+```
+
+|       By looking at the calculations above, it does not seem that there are any apparent outliers within the Cook's distance calculations. Therefore, none of our observations appear to be influential points.
+
+```{r resid}
+resid(new_model)
+studres(new_model)
+```
+
+|           Above we see the calculation of the standardized and studentized residuals. Suppose there is a strong influential point and is therefore pulling the regression line toward it. This point may not be flagged as an outlier using only the standardized residuals.  Studentized residuals address this issue because they are basically "deleting" each observation and refitting the model in order to determine if one observation is an influential point.
+
+
+### 3a.
+
+See handwritten work.
+
+### 3b. 
+
+See handwritten work.
+
+### 3c.
+
+|       I am definitely still working on this part, but I used to do the bisection method in my numerical analysis class so I am 100% interested. So even if you won't accept this final part later, know I am going to do it anyway!
+
